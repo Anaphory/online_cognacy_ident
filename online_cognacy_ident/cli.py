@@ -5,7 +5,7 @@ import time
 
 from online_cognacy_ident.clustering import cluster
 from online_cognacy_ident.dataset import (
-        Dataset, PairsDataset, DatasetError, write_clusters)
+        Dataset, CLDFDataset, PairsDataset, DatasetError, write_clusters)
 from online_cognacy_ident.evaluation import calc_f_score
 from online_cognacy_ident.model import save_model, load_model, ModelError
 from online_cognacy_ident.phmm import train_phmm, apply_phmm
@@ -101,7 +101,7 @@ class TrainCli:
         io_args = self.parser.add_argument_group('optional arguments - input/output')
         io_args.add_argument(
             '--dataset-type',
-            choices=['standard', 'pairs'],
+            choices=['standard', 'pairs', 'cldf'],
             default='pairs',
             help=(
                 'pairs (the default) refers to the specific format used '
@@ -146,6 +146,8 @@ class TrainCli:
         try:
             if args.dataset_type == 'pairs':
                 dataset = PairsDataset(args.dataset)
+            if args.dataset_type == 'cldf':
+                dataset = CLDFDataset(args.dataset, args.ipa)
             else:
                 dataset = Dataset(args.dataset, args.csv_dialect, args.ipa)
         except DatasetError as err:
@@ -250,7 +252,7 @@ class RunCli:
         start_time = time.time()
 
         try:
-            dataset = Dataset(args.dataset, args.dialect_input, args.ipa)
+            dataset = CLDFDataset(args.dataset, args.ipa)
             algorithm, model = load_model(args.model)
         except (DatasetError, ModelError) as err:
             self.parser.error(str(err))

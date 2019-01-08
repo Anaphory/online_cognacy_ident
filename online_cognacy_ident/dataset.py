@@ -7,8 +7,13 @@ import sys
 
 from lingpy.sequence.sound_classes import ipa2tokens, tokens2class
 
+import pycldf
+import pyclts
+
 from online_cognacy_ident.align import normalized_levenshtein
 
+bipa = pyclts.TranscriptionSystem("bipa")
+asjp = pyclts.SoundClasses("asjp")
 
 
 """
@@ -169,9 +174,6 @@ class Dataset:
                     else:
                         yield word
 
-        except OSError as err:
-            raise DatasetError('Could not open file: {}'.format(self.path))
-
         except csv.Error as err:
             raise DatasetError('Could not read file: {}'.format(self.path))
 
@@ -300,6 +302,49 @@ class Dataset:
         return {key: frozenset(value) for key, value in clusters.items()}
 
 
+class CLDFDataset (Dataset):
+    """A Dataset subclass for CLDF wordlists. """
+    def __init__(self, path, is_ipa=False):
+        """Create, based on the path to a CLDF wordlist.
+
+        If is_ipa is set, assume that the transcriptions are in IPA and convert
+        them into ASJP.
+        """
+
+        dataset = pycldf.Wordlist.from_metadata(path)
+
+        self.dataset = dataset
+        self.is_ipa = is_ipa
+
+        self.alphabet = None
+
+    def _read_words(self, cog_sets=False):
+        """
+        """
+        c_doculect = self.dataset["FormTable", "languageReference"].name
+        c_concept = self.dataset["FormTable", "parameterReference"].name
+        c_segments = self.dataset["FormTable", "segments"].name
+        try:
+            c_cog = self.dataset["FormTable", "cognatesetReference"].name
+        except KeyError:
+            pass
+
+        self.equilibrium = defaultdict(float)
+
+        for row in self.dataset["FormTable"].iterdicts():
+            asjp_segments = [asjp[bipa[s]] if bipa[s].name else '0'
+                             for s in row[c_segments]]
+            if not asjp_segments:
+                continue
+
+            word = Word(row[c_doculect], row[c_concept], tuple(asjp_segments))
+            for i in asjp_segments:
+                self.equilibrium[i] += 1.0
+
+            if cog_sets:
+                yield word, row[c_cog]
+            else:
+                yield word
 
 class PairsDataset:
     """
@@ -332,18 +377,11 @@ class PairsDataset:
         Generate the (asjp, asjp, edit distance) entries from the dataset.
         Raise a DatasetError if there is a problem reading the file.
         """
-        try:
-            with open(self.path, encoding='utf-8') as f:
-                reader = csv.reader(f, delimiter='\t')
+        with open(self.path, encoding='utf-8') as f:
+            reader = csv.reader(f, delimiter='\t')
 
-                for row in reader:
-                    yield row[0], row[1], float(row[2])
-
-        except OSError as err:
-            raise DatasetError('Could not open file: {}'.format(self.path))
-
-        except (IndexError, ValueError) as err:
-            raise DatasetError('Could not read file: {}'.format(self.path))
+            for row in reader:
+                yield row[0], row[1], float(row[2])
 
 
     def get_alphabet(self):
