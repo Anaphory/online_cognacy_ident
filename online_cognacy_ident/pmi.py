@@ -34,7 +34,7 @@ def calc_pmi(alignment_dict, char_list, scores, initialize=False):
 
     if initialize == True:
         for c1, c2 in itertools.product(char_list, repeat=2):
-            if c1 == "-" or c2 == "-":
+            if c1 == "" or c2 == "":
                 continue
             count_dict[c1,c2] += 0.001
             count_dict[c2,c1] += 0.001
@@ -46,7 +46,7 @@ def calc_pmi(alignment_dict, char_list, scores, initialize=False):
     for alignment, score in zip(alignment_dict, scores):
         #score = 1.0
         for a1, a2 in alignment:
-            if a1 == "-" or a2 == "-":
+            if a1 == "" or a2 == "":
                 continue
             count_dict[a1,a2] += 1.0*score
             count_dict[a2,a1] += 1.0*score
