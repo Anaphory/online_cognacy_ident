@@ -33,7 +33,7 @@ RECOGNISED_COLUMN_NAMES = {
 The named tuple used in the return values of the get_words, get_concepts, and
 get_clusters methods of Dataset objects.
 """
-Word = namedtuple('Word', 'doculect, concept, asjp')
+Word = namedtuple('Word', ['doculect', 'concept', 'asjp', 'id'])
 
 
 
@@ -167,7 +167,8 @@ class Dataset:
                     word = Word._make([
                         line[header['doculect']],
                         line[header['concept']],
-                        asjp ])
+                        asjp,
+                        None])
 
                     if cog_sets:
                         yield word, line[header['cog_class']]
@@ -324,6 +325,7 @@ class CLDFDataset (Dataset):
         c_doculect = self.dataset["FormTable", "languageReference"].name
         c_concept = self.dataset["FormTable", "parameterReference"].name
         c_segments = self.dataset["FormTable", "segments"].name
+        c_id = self.dataset["FormTable", "id"].name
         try:
             c_cog = self.dataset["FormTable", "cognatesetReference"].name
         except KeyError:
@@ -332,12 +334,20 @@ class CLDFDataset (Dataset):
         self.equilibrium = defaultdict(float)
 
         for row in self.dataset["FormTable"].iterdicts():
-            asjp_segments = [asjp[bipa[s]] if bipa[s].name else '0'
-                             for s in row[c_segments]]
+            if self.is_ipa:
+                asjp_segments = [asjp[bipa[s]] if bipa[s].name else '0'
+                                for s in row[c_segments]]
+            else:
+                asjp_segments = row[c_segments]
+
             if not asjp_segments:
                 continue
 
-            word = Word(row[c_doculect], row[c_concept], tuple(asjp_segments))
+            word = Word(
+                row[c_doculect],
+                row[c_concept],
+                tuple(asjp_segments),
+                row[c_id])
             for i in asjp_segments:
                 self.equilibrium[i] += 1.0
 
