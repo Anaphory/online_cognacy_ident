@@ -36,7 +36,7 @@ def clusters(draw):
 
         for lang in langs:
             cog_class = draw(integers(min_value=0, max_value=5))
-            word = Word._make([lang, concept, asjp[next(counter)]])
+            word = Word._make([lang, concept, asjp[next(counter)], None])
             cog_sets[cog_class].add(word)
 
         clusters[concept] = frozenset([
@@ -92,9 +92,9 @@ class DatasetTestCase(TestCase):
         words = dataset.get_words()
 
         self.assertEqual(len(words), 271)
-        self.assertEqual(words[0], Word('TRING', 'I', 'Ne'))
-        self.assertEqual(words[-9], Word('SAMAP', 'die', 'gureNnand'))
-        self.assertEqual(words[-1], Word('SAMAP', 'road (path)', 'N3m'))
+        self.assertEqual(words[0], Word('TRING', 'I', 'Ne', None))
+        self.assertEqual(words[-9], Word('SAMAP', 'die', 'gureNnand', None))
+        self.assertEqual(words[-1], Word('SAMAP', 'road (path)', 'N3m', None))
 
     def test_get_concepts_with_kamasau(self):
         dataset = Dataset('datasets/kamasau.tsv')
