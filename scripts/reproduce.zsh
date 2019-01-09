@@ -1,4 +1,4 @@
-#!/usr/bin/fish
+#!/usr/bin/zsh
 
 # path to the data all the models are trained on
 training_dataset='training_data/asjpv17_word_pairs.txt'
@@ -21,7 +21,7 @@ function train_run_eval () {
 		ipa_flag='--ipa'
 	fi
 
-	model_name="models/$algo/asjp_m=$batch_size,α=$alpha.$algo"
+	model_name="models/$algo/asjp_m=$batch_size,alpha=$alpha.$algo"
 
 	if [[ ! -f $model_name ]]
 	then
