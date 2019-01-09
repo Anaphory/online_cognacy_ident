@@ -3,6 +3,8 @@ import csv
 import random
 import time
 
+from json.decoder import JSONDecodeError
+
 from online_cognacy_ident.clustering import cluster
 from online_cognacy_ident.dataset import (
         Dataset, CLDFDataset, PairsDataset, DatasetError, write_clusters)
@@ -146,7 +148,7 @@ class TrainCli:
         try:
             if args.dataset_type == 'pairs':
                 dataset = PairsDataset(args.dataset)
-            if args.dataset_type == 'cldf':
+            elif args.dataset_type == 'cldf':
                 dataset = CLDFDataset(args.dataset, args.ipa)
             else:
                 dataset = Dataset(args.dataset, args.csv_dialect, args.ipa)
@@ -252,7 +254,10 @@ class RunCli:
         start_time = time.time()
 
         try:
-            dataset = CLDFDataset(args.dataset, args.ipa)
+            try:
+                dataset = CLDFDataset(args.dataset, args.ipa)
+            except JSONDecodeError:
+                dataset = Dataset(args.dataset, args.dialect_input, args.ipa)
             algorithm, model = load_model(args.model)
         except (DatasetError, ModelError) as err:
             self.parser.error(str(err))
