@@ -131,7 +131,7 @@ def apply_pmi(dataset, pmi):
 
     for concept, words in dataset.get_concepts().items():
         for word1, word2 in itertools.combinations(words, 2):
-            score, _ = needleman_wunsch(word1.asjp, word2.asjp, pmi)
+            score, _ = needleman_wunsch(word1.sc, word2.sc, pmi)
             score = 1 - sigmoid(score)
 
             key = (word1, word2) if word1 < word2 else (word2, word1)

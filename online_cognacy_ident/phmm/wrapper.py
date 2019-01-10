@@ -204,8 +204,8 @@ def apply_phmm(dataset, em, gx, gy, trans):
 
     for concept, words in dataset.get_concepts().items():
         for word1, word2 in itertools.combinations(words, 2):
-            s1 = [alphabet[i] for i in word1.asjp]
-            s2 = [alphabet[i] for i in word2.asjp]
+            s1 = [alphabet[i] for i in word1.sc]
+            s2 = [alphabet[i] for i in word2.sc]
             v_score = model.viterbi(s1, s2)[1]
             r_score = model.random_model(s1, s2, eq)
             key = (word1, word2) if word1 < word2 else (word2, word1)

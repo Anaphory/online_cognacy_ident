@@ -5,15 +5,14 @@ import itertools
 import os.path
 import sys
 
-from lingpy.sequence.sound_classes import ipa2tokens, tokens2class
-
 import pycldf
 import pyclts
+from segments import Tokenizer, Profile
 
 from online_cognacy_ident.align import normalized_levenshtein
 
 bipa = pyclts.TranscriptionSystem("bipa")
-asjp = pyclts.SoundClasses("asjp")
+tokenizer = Tokenizer()
 
 
 """
@@ -33,7 +32,7 @@ RECOGNISED_COLUMN_NAMES = {
 The named tuple used in the return values of the get_words, get_concepts, and
 get_clusters methods of Dataset objects.
 """
-Word = namedtuple('Word', ['doculect', 'concept', 'asjp', 'id'])
+Word = namedtuple('Word', ['doculect', 'concept', 'sc', 'id'])
 
 
 
@@ -61,7 +60,7 @@ class Dataset:
             print(err)
     """
 
-    def __init__(self, path, dialect=None, is_ipa=False):
+    def __init__(self, path, dialect=None, transform=None):
         """
         Set the instance's props. Raise a DatasetError if the given file path
         does not exist. 
@@ -72,7 +71,7 @@ class Dataset:
         but unrecognised.
 
         If is_ipa is set, assume that the transcriptions are in IPA and convert
-        them into ASJP.
+        them into some other sound class model.
         """
         if not os.path.exists(path):
             raise DatasetError('Could not find file: {}'.format(path))
@@ -84,7 +83,7 @@ class Dataset:
 
         self.path = path
         self.dialect = dialect
-        self.is_ipa = is_ipa
+        self.transform = transform
 
         self.alphabet = None
 
@@ -118,7 +117,7 @@ class Dataset:
 
     def _read_asjp(self, raw_trans):
         """
-        Process a raw transcription value into an ASJP transcription:
+        Process a raw transcription value into a sound class transcription, eg. ASJP:
         (1) if the input string consists of multiple comma-separated entries,
         remove all but the first one;
         (2) remove whitespace chars (the symbols +, - and _ are also considered
@@ -128,16 +127,14 @@ class Dataset:
 
         Helper for the _read_words method.
         """
+
         trans = raw_trans.strip().split(',')[0].strip()
+        trans = [bipa[x]
+                 for part in trans.split(".")
+                 for x in tokenizer(part, ipa=True).split()]
 
-        for char in '+-_ ':
-            trans = trans.replace(char, '')
-
-        if self.is_ipa:
-            trans = ''.join(tokens2class(ipa2tokens(trans), 'asjp'))
-
-        for char in '"$%*~':
-            trans = trans.replace(char, '')
+        if self.transform is not None:
+            trans = [self.transform(s) for s in trans]
 
         return trans
 
@@ -167,7 +164,7 @@ class Dataset:
                     word = Word._make([
                         line[header['doculect']],
                         line[header['concept']],
-                        asjp,
+                        tuple(asjp),
                         None])
 
                     if cog_sets:
@@ -192,7 +189,7 @@ class Dataset:
     def get_alphabet(self):
         """
         Return a sorted list of all characters found throughout transcriptions
-        in the dataset. Raise a DatasetError if there is a problem.
+        in the dataset.
         """
         if self.alphabet is not None:
             return self.alphabet
@@ -200,7 +197,7 @@ class Dataset:
         self.alphabet = set()
 
         for word in self.get_words():
-            self.alphabet |= set(word.asjp)
+            self.alphabet |= set(word.sc)
 
         self.alphabet = sorted(self.alphabet)
 
@@ -264,15 +261,15 @@ class Dataset:
                 if word1.doculect == word2.doculect:
                     continue
 
-                if normalized_levenshtein(word1.asjp, word2.asjp) > cutoff:
+                if normalized_levenshtein(word1.sc, word2.sc) > cutoff:
                     continue
 
                 if as_int_tuples:
                     pair = (
-                        tuple([alphabet.index(char) for char in word1.asjp]),
-                        tuple([alphabet.index(char) for char in word2.asjp]))
+                        tuple([alphabet.index(char) for char in word1.sc]),
+                        tuple([alphabet.index(char) for char in word2.sc]))
                 else:
-                    pair = (word1.asjp, word2.asjp)
+                    pair = (word1.sc, word2.sc)
 
                 pairs.append(pair)
 
@@ -305,17 +302,30 @@ class Dataset:
 
 class CLDFDataset (Dataset):
     """A Dataset subclass for CLDF wordlists. """
-    def __init__(self, path, is_ipa=False):
+    def __init__(self, path, transform=None):
         """Create, based on the path to a CLDF wordlist.
 
-        If is_ipa is set, assume that the transcriptions are in IPA and convert
-        them into ASJP.
+        This constructure assumes that a 'forms.csv' file is a metadata-free
+        wordlist, and that any other file is a Wordlist metadata json file.
+
+        Parameters
+        ==========
+        path: string or Path
+            The path to a CLDF wordlist metadata file.
+            (Metadata-free wordlists are not supported yet.)
+        is_ipa: function Symbol→String or None
+            A function to convert bipa Sounds into sound class symbols
+            (Use None for no conversion)
+
         """
 
-        dataset = pycldf.Wordlist.from_metadata(path)
+        if str(path).endswith("forms.csv"):
+            dataset = pycldf.Wordlist.from_data(path)
+        else:
+            dataset = pycldf.Wordlist.from_metadata(path)
 
         self.dataset = dataset
-        self.is_ipa = is_ipa
+        self.transform = transform
 
         self.alphabet = None
 
@@ -326,19 +336,25 @@ class CLDFDataset (Dataset):
         c_concept = self.dataset["FormTable", "parameterReference"].name
         c_segments = self.dataset["FormTable", "segments"].name
         c_id = self.dataset["FormTable", "id"].name
-        try:
-            c_cog = self.dataset["FormTable", "cognatesetReference"].name
-        except KeyError:
-            pass
+        if cog_sets:
+            try:
+                c_cog = self.dataset["FormTable", "cognatesetReference"].name
+                lookup = False
+            except KeyError:
+                c_cog = self.dataset["CognatesetTable", "cognatesetReference"].name
+                c_form = self.dataset["CognatesetTable", "formReference"].name
+                lookup = {}
+                for row in self.dataset["CognatesetTable"].iterdicts():
+                    lookup[row[c_form]] = row[c_cog]
 
         self.equilibrium = defaultdict(float)
 
         for row in self.dataset["FormTable"].iterdicts():
-            if self.is_ipa:
-                asjp_segments = [asjp[bipa[s]] if bipa[s].name else '0'
-                                for s in row[c_segments]]
-            else:
+            if self.transform is None:
                 asjp_segments = row[c_segments]
+            else:
+                asjp_segments = [self.transform(bipa[s]) if bipa[s].name else '0'
+                                 for s in row[c_segments]]
 
             if not asjp_segments:
                 continue
@@ -352,7 +368,10 @@ class CLDFDataset (Dataset):
                 self.equilibrium[i] += 1.0
 
             if cog_sets:
-                yield word, row[c_cog]
+                if lookup:
+                    yield word, lookup.get(word.id, None)
+                else:
+                    yield word, row[c_cog]
             else:
                 yield word
 
@@ -370,7 +389,7 @@ class PairsDataset:
             print(err)
     """
 
-    def __init__(self, path):
+    def __init__(self, path, transform=None):
         """
         Set the instance's props. Raise a DatasetError if the given file path
         does not exist.
@@ -380,6 +399,7 @@ class PairsDataset:
 
         self.path = path
         self.alphabet = None
+        self.transform = str if transform is None else transform
 
 
     def _read_pairs(self):
@@ -391,7 +411,13 @@ class PairsDataset:
             reader = csv.reader(f, delimiter='\t')
 
             for row in reader:
-                yield row[0], row[1], float(row[2])
+                item1 = [self.transform(x)
+                         for part in row[0].split(".")
+                         for x in tokenizer(part, ipa=True).split()]
+                item2 = [self.transform(x)
+                         for part in row[1].split(".")
+                         for x in tokenizer(part, ipa=True).split()]
+                yield item1, item2, float(row[2])
 
 
     def get_alphabet(self):
@@ -472,7 +498,7 @@ def write_clusters(clusters, path=None, dialect='excel-tab'):
         for index, cog_set in enumerate(cog_sets):
             for word in sorted(cog_set):
                 writer.writerow([
-                    word.concept, word.doculect, word.asjp,
+                    word.concept, word.doculect, word.sc,
                     '{}:{!s}'.format(concept, index)])
 
     if path:

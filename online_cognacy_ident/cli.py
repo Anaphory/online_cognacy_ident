@@ -5,6 +5,8 @@ import time
 
 from json.decoder import JSONDecodeError
 
+import pyclts
+
 from online_cognacy_ident.clustering import cluster
 from online_cognacy_ident.dataset import (
         Dataset, CLDFDataset, PairsDataset, DatasetError, write_clusters)
@@ -12,6 +14,8 @@ from online_cognacy_ident.evaluation import calc_f_score
 from online_cognacy_ident.model import save_model, load_model, ModelError
 from online_cognacy_ident.phmm import train_phmm, apply_phmm
 from online_cognacy_ident.pmi import train_pmi, apply_pmi
+
+sound_classes = pyclts.soundclasses.SOUNDCLASS_SYSTEMS
 
 
 
@@ -121,8 +125,16 @@ class TrainCli:
             '-i', '--ipa',
             action='store_true',
             help=(
-                'convert input transcriptions from IPA to ASJP; '
-                'by default these are assumed to be ASJP'))
+                'convert input transcriptions from IPA to another sound class model; '
+                'by default these are assumed to be in target transcription'))
+        io_args.add_argument(
+            '-s', '--sound-class-model',
+            choices=sound_classes,
+            default='asjp',
+            help=(
+                'convert IPA input to this sound class model; '
+                'ignored when input is not IPA. '
+                '(default: asjp)'))
 
         other_args = self.parser.add_argument_group('optional arguments - other')
         other_args.add_argument(
@@ -145,19 +157,32 @@ class TrainCli:
         random.seed(args.random_seed)
         start_time = time.time()
 
+        if args.ipa:
+            sc = pyclts.SoundClasses(args.sound_class_model)
+            def transform(sound):
+                try:
+                    return sc[sound]
+                except KeyError:
+                    return '0'
+        else:
+            def transform(sound):
+                return sound
+
         try:
             if args.dataset_type == 'pairs':
-                dataset = PairsDataset(args.dataset)
+                dataset = PairsDataset(args.dataset, transform=transform)
             elif args.dataset_type == 'cldf':
-                dataset = CLDFDataset(args.dataset, args.ipa)
+                dataset = CLDFDataset(args.dataset, transform=transform)
             else:
-                dataset = Dataset(args.dataset, args.csv_dialect, args.ipa)
+                dataset = Dataset(args.dataset, args.csv_dialect, transform=transform)
         except DatasetError as err:
             self.parser.error(str(err))
 
-        print('training {} on {}, ipa→asjp={}, m={!s}, α={:.2f}'.format(
-                    args.algorithm.upper(), args.dataset,
-                    'yes' if args.ipa else 'no', args.batch_size, args.alpha))
+        print(
+            'training {} on {}, conversion={}{}{}, m={!s}, α={:.2f}'.format(
+                args.algorithm.upper(), args.dataset,
+                'ipa→' if args.ipa else '(', args.sound_class_model, '' if args.ipa else ')',
+                args.batch_size, args.alpha))
 
         train_func = train_phmm if args.algorithm == 'phmm' else train_pmi
         model = train_func(
@@ -223,8 +248,16 @@ class RunCli:
             '-i', '--ipa',
             action='store_true',
             help=(
-                'convert input transcriptions from IPA to ASJP; '
-                'by default these are assumed to be ASJP'))
+                'convert input transcriptions from IPA to another sound class model; '
+                'by default these are assumed to be in target transcription'))
+        io_args.add_argument(
+            '-s', '--sound-class-model',
+            choices=sound_classes,
+            default='asjp',
+            help=(
+                'convert IPA input to this sound class model; '
+                'ignored when input is not IPA. '
+                '(default: asjp)'))
         io_args.add_argument(
             '-e', '--evaluate',
             action='store_true',
@@ -253,17 +286,27 @@ class RunCli:
 
         start_time = time.time()
 
+        if args.ipa:
+            sc = pyclts.SoundClasses(args.sound_class_model)
+            def transform(sound):
+                return sc[sound]
+        else:
+            def transform(sound):
+                return sound
+
         try:
             try:
-                dataset = CLDFDataset(args.dataset, args.ipa)
+                dataset = CLDFDataset(args.dataset, transform=transform)
             except JSONDecodeError:
-                dataset = Dataset(args.dataset, args.dialect_input, args.ipa)
+                dataset = Dataset(args.dataset, args.dialect_input, transform=transform)
             algorithm, model = load_model(args.model)
         except (DatasetError, ModelError) as err:
             self.parser.error(str(err))
 
-        print('running {} on {}, ipa→asjp={}'.format(
-                    args.model, args.dataset, 'yes' if args.ipa else 'no'))
+        print(
+            'running {} on {}, conversion={}{}{}'.format(
+                args.model, args.dataset,
+                'ipa→' if args.ipa else '(', args.sound_class_model, '' if args.ipa else ')'))
 
         if algorithm == 'phmm':
             scores = apply_phmm(dataset, *model)
@@ -307,7 +350,18 @@ class EvalCli:
         self.parser.add_argument('dataset_pred', help=(
             'path to the dataset containing the predicted cognate classes'))
 
-        csv_args = self.parser.add_argument_group('optional arguments - csv')
+        csv_args = self.parser.add_argument_group('optional arguments')
+        csv_args.add_argument(
+            '--type-true',
+            choices=["csv", "cldf"],
+            default="csv",
+            help=('Is the reference dataset a CSV or a CLDF dataset?'))
+        csv_args.add_argument(
+            '--type-pred',
+            choices=["csv", "cldf"],
+            default="csv",
+            help=('Is the prediction dataset a CSV or a CLDF dataset?'))
+
         csv_args.add_argument('--dialect-true',
             choices=csv.list_dialects(), help=(
                 'the csv dialect to use for reading the dataset '
@@ -335,8 +389,14 @@ class EvalCli:
         args = self.parser.parse_args(raw_args)
 
         try:
-            dataset_true = Dataset(args.dataset_true, args.dialect_true)
-            dataset_pred = Dataset(args.dataset_pred, args.dialect_pred)
+            if args.type_true == 'csv':
+                dataset_true = Dataset(args.dataset_true, args.dialect_true)
+            elif args.type_true == 'cldf':
+                dataset_true = CLDFDataset(args.dataset_true)
+            if args.type_true == 'csv':
+                dataset_pred = Dataset(args.dataset_pred, args.dialect_pred)
+            elif args.type_true == 'cldf':
+                dataset_pred = CLDFDataset(args.dataset_pred)
         except DatasetError as err:
             self.parser.error(str(err))
 
