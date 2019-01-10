@@ -165,8 +165,7 @@ class TrainCli:
                 except KeyError:
                     return '0'
         else:
-            def transform(sound):
-                return sound
+            transform = None
 
         try:
             if args.dataset_type == 'pairs':
@@ -291,8 +290,7 @@ class RunCli:
             def transform(sound):
                 return sc[sound]
         else:
-            def transform(sound):
-                return sound
+            transform = None
 
         try:
             try:
