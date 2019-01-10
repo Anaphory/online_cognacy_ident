@@ -21,19 +21,19 @@ function train_run_eval () {
 		ipa_flag='--ipa'
 	fi
 
-	model_name="models/$algo/asjp_m=$batch_size,alpha=$alpha.$algo"
+	model_name="models/$algo/asjp_m=$batch_size,alpha=$alpha,dataset=$dataset"
 
 	if [[ ! -f $model_name ]]
 	then
-		python train.py $algo \
-			$training_dataset \
+		python -m online_cognacy_ident.commands.train $algo \
+			--data cldf datasets/$dataset/Wordlist-metadata.json $ipa_flag \
 			$model_name \
 			--batch-size $batch_size --alpha $alpha \
 			--time
 	fi
 
-	python run.py $model_name \
-		datasets/$dataset.tsv $ipa_flag \
+	python -m online_cognacy_ident.commands.run $model_name \
+		datasets/$dataset/Wordlist-metadata.json $ipa_flag \
 		--output output/$algo/$dataset.tsv \
 		--evaluate
 
