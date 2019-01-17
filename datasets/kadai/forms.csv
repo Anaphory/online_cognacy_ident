@@ -1,4 +1,4 @@
-ID,Cognateset_ID,Language_ID,ISO639P3code,Gloss,Concepticon_ID,Parameter_ID,Form,Class,Segments,Comment
+ID,Cognateset_ID,Language_ID,ISO639P3code,English_Gloss,Concepticon_ID,Parameter_ID,Form,Class,Segments,Comment
 1,1-1,SIAMESE,tha,"I",1209,1,ku,1,k u,
 2,1-2,ZHUANG_SOUTHERN,zzj,"I",1209,1,kau,2,k a u,
 3,1-2,ZHUANG_NORTHERN,zgn,"I",1209,1,kou,2,k o u,

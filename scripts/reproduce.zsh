@@ -32,7 +32,7 @@ function train_run_eval () {
 			--time
 	fi
 
-	python -m online_cognacy_ident.commands.run $model_name \
+	python -im online_cognacy_ident.commands.run $model_name \
 		datasets/$dataset/Wordlist-metadata.json $ipa_flag \
 		--output output/$algo/$dataset.tsv \
 		--evaluate

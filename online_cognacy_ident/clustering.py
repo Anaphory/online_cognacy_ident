@@ -1,9 +1,10 @@
 import collections
 import itertools
 
-import igraph
 import numpy as np
 
+import igraph
+from lingpy.algorithm.clustering import mcl, flat_cluster
 
 
 def igraph_clustering(matrix, threshold, method='infomap'):
@@ -66,6 +67,37 @@ def igraph_clustering(matrix, threshold, method='infomap'):
     return D
 
 
+def clustering(matrix, threshold, cluster_method='infomap'):
+    if callable(cluster_method):
+        c = external_function(
+            threshold, matrix)
+    elif cluster_method in ['infomap', 'labelprop', 'ebet', 'multilevel', 'spinglass']:
+        c = igraph_clustering(
+            matrix, threshold, method=cluster_method)
+    elif cluster_method == 'mcl':
+        kw = dict(max_steps=1000,
+                  inflation=2,
+                  expansion=2,
+                  add_self_loops=True,
+                  mcl_logs=lambda x: -np.log2((1 - x) ** 2))
+        c = mcl(
+            threshold, matrix,
+            taxa = list(range(len(matrix))), revert=True,
+            # More mcl parameters
+            max_steps=kw['max_steps'],
+            inflation=kw['inflation'],
+            expansion=kw['expansion'],
+            add_self_loops=kw['add_self_loops'],
+            logs=kw['mcl_logs'])
+    elif cluster_method in ['upgma', 'single', 'complete', 'ward']:
+        c = flat_cluster(
+            cluster_method,
+            threshold, [[c for c in r] for r in matrix],
+            revert=True)
+    else:
+        raise ValueError("No clustering method named {:}".format(cluster_method))
+    return c
+
 
 def cluster(dataset, scores, threshold=0.5, method='infomap'):
     """
@@ -86,9 +118,13 @@ def cluster(dataset, scores, threshold=0.5, method='infomap'):
 
         for (i, word1), (j, word2) in itertools.combinations(enumerate(words), 2):
             key = (word1, word2) if word1 < word2 else (word2, word1)
-            matrix[j, i] = matrix[i, j] = scores[key]
+            try:
+                matrix[j, i] = matrix[i, j] = scores[key]
+            except KeyError:
+                key = (word1, word2) if word1 > word2 else (word2, word1)
+                matrix[j, i] = matrix[i, j] = scores[key]
 
-        index_labels = igraph_clustering(matrix, threshold, method)
+        index_labels = clustering(matrix, threshold, method)
 
         cog_sets = collections.defaultdict(set)
         for index, label in index_labels.items():

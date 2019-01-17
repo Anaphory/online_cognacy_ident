@@ -1,4 +1,4 @@
-ID,Cognateset_ID,Language_ID,ISO639P3code,Gloss,Concepticon_ID,Parameter_ID,Form,Class,Segments,Comment
+ID,Cognateset_ID,Language_ID,ISO639P3code,English_Gloss,Concepticon_ID,Parameter_ID,Form,Class,Segments,Comment
 1,sharp-sharp:C,ANCIENT_GREEK,grc,"sharp",1396,sharp,oksýs,sharp:C,o k s ý s,
 2,sharp-sharp:J,GREEK,ell,"sharp",1396,sharp,ˌko̞fte̞ˈro̞s,sharp:J,ˌk o̞ f t e̞ ˈr o̞ s,
 3,sharp-sharp:D,CLASSICAL_ARMENIAN,xcl,"sharp",1396,sharp,sowr,sharp:D,s o w r,
@@ -10125,7 +10125,7 @@ ID,Cognateset_ID,Language_ID,ISO639P3code,Gloss,Concepticon_ID,Parameter_ID,Form
 10124,liver-liver:F,SPANISH,spa,"liver",1224,liver,iɣaðo,liver:F,i ɣ a ð o,
 10125,liver-liver:F,FRENCH,fra,"liver",1224,liver,fwa,liver:F,f w a,
 10126,liver-liver:F,ITALIAN,ita,"liver",1224,liver,fegato,liver:F,f e g a t o,
-10127,liver-liver:D,OLD_IRISH,sga,"liver",1224,liver,o:a_?,liver:D,o: a _ ?,
+10127,liver-liver:D,OLD_IRISH,sga,"liver",1224,liver,o:a,liver:D,o: a,
 10128,liver-liver:D,MIDDLE_CORNISH,cor,"liver",1224,liver,avi,liver:D,a v i,
 10129,liver-liver:D,MIDDLE_BRETON,,"liver",1224,liver,ˈaːvy,liver:D,ˈaː v y,
 10130,liver-liver:D,BRETON,bre,"liver",1224,liver,ˈaːvy,liver:D,ˈaː v y,

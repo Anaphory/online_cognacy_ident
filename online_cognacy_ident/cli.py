@@ -9,7 +9,8 @@ import pyclts
 
 from online_cognacy_ident.clustering import cluster
 from online_cognacy_ident.dataset import (
-        Dataset, CLDFDataset, PairsDataset, DatasetError, write_clusters)
+    Dataset, CLDFDataset, PairsDataset, DatasetError,
+    write_clusters, write_cldf_clusters)
 from online_cognacy_ident.evaluation import calc_f_score
 from online_cognacy_ident.model import save_model, load_model, ModelError
 from online_cognacy_ident.phmm import train_phmm, apply_phmm
@@ -223,6 +224,10 @@ class RunCli:
         self.parser.add_argument(
             'dataset',
             help='path to a dataset to run cognacy identification on')
+        self.parser.add_argument(
+            '--cluster-method',
+            default="infomap",
+            help='clustering method to use (default: infomap)')
 
         io_args = self.parser.add_argument_group('optional arguments - input/output')
         io_args.add_argument(
@@ -282,6 +287,7 @@ class RunCli:
         which is what you would want unless you are unit testing).
         """
         args = self.parser.parse_args(raw_args)
+        output_cldf_dataset = False
 
         start_time = time.time()
 
@@ -295,6 +301,7 @@ class RunCli:
         try:
             try:
                 dataset = CLDFDataset(args.dataset, transform=transform)
+                output_cldf_dataset = True
             except JSONDecodeError:
                 dataset = Dataset(args.dataset, args.dialect_input, transform=transform)
             algorithm, model = load_model(args.model)
@@ -311,8 +318,11 @@ class RunCli:
         else:
             scores = apply_pmi(dataset, model)
 
-        clusters = cluster(dataset, scores)
-        write_clusters(clusters, args.output, args.dialect_output)
+        clusters = cluster(dataset, scores, method=args.cluster_method)
+        if output_cldf_dataset:
+            write_cldf_clusters(clusters, args.output, dataset.dataset)
+        else:
+            write_clusters(clusters, args.output, args.dialect_output)
 
         if args.time:
             print('running time: {:.2f} sec'.format(time.time() - start_time))

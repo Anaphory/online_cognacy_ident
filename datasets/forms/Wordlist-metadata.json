@@ -46,7 +46,7 @@
                         }
                     },
                     {
-                        "name": "Gloss",
+                        "name": "English_Gloss",
                         "required": true,
                         "propertyUrl": "http://cldf.clld.org/v1.0/terms.rdf#translatedText",
                         "datatype": "string"

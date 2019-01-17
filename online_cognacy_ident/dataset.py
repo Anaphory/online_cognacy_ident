@@ -2,9 +2,10 @@ from collections import defaultdict, namedtuple
 
 import csv
 import itertools
-import os.path
+from pathlib import Path
 import sys
 
+from csvw.metadata import Column, ForeignKey, Datatype, Link
 import pycldf
 import pyclts
 from segments import Tokenizer, Profile
@@ -73,7 +74,7 @@ class Dataset:
         If is_ipa is set, assume that the transcriptions are in IPA and convert
         them into some other sound class model.
         """
-        if not os.path.exists(path):
+        if not Path(path).exists():
             raise DatasetError('Could not find file: {}'.format(path))
 
         if dialect is None:
@@ -394,7 +395,7 @@ class PairsDataset:
         Set the instance's props. Raise a DatasetError if the given file path
         does not exist.
         """
-        if not os.path.exists(path):
+        if not Path(path).exists():
             raise DatasetError('Could not find file: {}'.format(path))
 
         self.path = path
@@ -470,10 +471,65 @@ class PairsDataset:
         return pairs
 
 
+def write_cldf_clusters(clusters, path, original_dataset):
+    """Write cognate set clusters to a cldf CognatesetTable.
+
+    Extend the existing dataset at a new location with a CognatesetTable, with
+    columns: id, transcription. The latter comprises automatically generated id
+    strings of the type concept:number.
+
+    The clusters arg should be a dict mapping concepts to frozen sets of frozen
+    sets of Word named tuples.
+
+    If path is None, use stdout. Raise a DatasetError if the file/stdout cannot
+    be written into.
+
+    """
+    cognatetables = []
+    for t, table in enumerate(original_dataset.tables):
+        if table.common_props.get("dc:conformsTo", '').endswith('CognateTable'):
+            cognatetables.insert(0, t)
+        else:
+            # Make table urls absolute
+            table.url = Link(str(table.url.resolve(table._parent.base)))
+            for key in table.tableSchema.foreignKeys:
+                key.reference.resource = Link(
+                    str(key.reference.resource.resolve(table._parent.base)))
+    original_dataset.write_metadata(fname=path)
+
+    new_dataset = pycldf.Wordlist.from_metadata(path)
+    # Delete existing cognate tables
+    for t in cognatetables:
+        del new_dataset.tables[t]
+
+    # Add a new, local cognate table
+    output_rows = []
+    new_dataset.add_component(
+        "CognateTable")
+    if new_dataset["CognateTable"].url.resolve(table._parent.base).exists():
+        new_dataset["CognateTable"].url = Link(Path(path).stem + '-cognates.csv')
+    new_dataset["CognateTable", "Form_ID"].datatype = new_dataset["FormTable", "id"].datatype
+    new_dataset["CognateTable", "ID"].datatype = Datatype.fromvalue("integer")
+
+    new_dataset.write_metadata(fname=path)
+
+    i = 0
+    for concept, cog_sets in sorted(clusters.items()):
+        for index, cog_set in enumerate(cog_sets):
+            for word in sorted(cog_set):
+                i += 1
+                output_rows.append({
+                    "ID": i,
+                    "Form_ID": word.id,
+                    "Cognateset_ID": '{}:{!s}'.format(concept, index)
+                })
+
+    new_dataset["CognateTable"].write(output_rows)
+
 
 def write_clusters(clusters, path=None, dialect='excel-tab'):
     """
-    Write cognate set clusters to a csv file with columns: concept, doculect,
+    Write cognate set clusters to a csv file with columns: id, concept, doculect,
     transcription, cog_class. The latter comprises automatically generated id
     strings of the type concept:number.
 
@@ -492,13 +548,13 @@ def write_clusters(clusters, path=None, dialect='excel-tab'):
         f = sys.stdout
 
     writer = csv.writer(f, dialect=dialect)
-    writer.writerow(['concept', 'doculect', 'transcription', 'cog_class'])
+    writer.writerow(['ID', 'Parameter_ID', 'Language_ID', 'Form', 'Cognateset_ID'])
 
     for concept, cog_sets in sorted(clusters.items()):
         for index, cog_set in enumerate(cog_sets):
             for word in sorted(cog_set):
                 writer.writerow([
-                    word.concept, word.doculect, word.sc,
+                    word.id, word.concept, word.doculect, word.sc,
                     '{}:{!s}'.format(concept, index)])
 
     if path:

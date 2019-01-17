@@ -1,4 +1,4 @@
-ID,Cognateset_ID,Language_ID,ISO639P3code,Gloss,Concepticon_ID,Parameter_ID,Form,Class,Segments,Comment
+ID,Cognateset_ID,Language_ID,ISO639P3code,English_Gloss,Concepticon_ID,Parameter_ID,Form,Class,Segments,Comment
 1,1277-lima,1,Bali,"ban",hand,1277,1,lima,1,l i m a
 2,1230-daki,2,Bali,"ban",dirty,1230,10,daki,1,d a k i
 3,634-isi,3,Bali,"ban",meat/flesh,634,103,isi,31,i s i
