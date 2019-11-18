@@ -1,6 +1,6 @@
 appdirs==1.4.3
-attrs==17.3.0
-clldutils==1.14.0
+attrs
+clldutils
 colorlog==3.1.0
 configparser==3.5.0
 coverage==4.4.2
